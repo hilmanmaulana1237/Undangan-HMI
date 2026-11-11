@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pearl: #faf9f5;
+  --color-cream: #f4f6f3;
+  --color-card-bg: #ffffff;
+  --color-hmi-green: #006144;
+  --color-hmi-dark: #0a3324;
+  --color-hmi-emerald: #0d5238;
+  --color-gold: #b8860b;
+  --color-gold-deep: #8c6807;
+  --color-gold-soft: #d4af37;
+  --color-text-main: #0e2e21;
+  --color-text-muted: #4a6357;
+  
+  /* Fallback aliases mapped to bright palette */
+  --color-night-deep: #faf9f5;
+  --color-night: #ffffff;
+
+  --font-display: var(--font-display, "Cormorant Garamond", "Georgia", serif);
+  --font-body: var(--font-body, "Montserrat", "Segoe UI", sans-serif);
+
+  --keyframes-spotlight: spotlight 2s ease 0.75s 1 forwards;
+  --keyframes-spin-slow: spin 16s linear infinite;
+
+  @keyframes spotlight {
+    0% {
+      opacity: 0;
+      transform: translate(-72%, -62%) scale(0.5);
+    }
+    100% {
+      opacity: 1;
+      transform: translate(-50%, -40%) scale(1);
+    }
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #faf9f5;
+  color: #0e2e21;
+  font-family: var(--font-body);
+  font-variant-numeric: lining-nums;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(184, 134, 11, 0.25);
+  color: #006144;
+}
+
+/* Light Luxury Card & Stationery Classes */
+.glass-emerald-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(184, 134, 11, 0.28);
+  box-shadow: 0 10px 30px -5px rgba(0, 97, 68, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+}
+
+.glass-emerald {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(184, 134, 11, 0.25);
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #006144 0%, #b8860b 50%, #0d5238 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hmi-logo-container {
+  background: #ffffff;
+  border: 2px solid #b8860b;
+  box-shadow: 0 4px 14px rgba(184, 134, 11, 0.22);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f4f6f3;
+}
+::-webkit-scrollbar-thumb {
+  background: #bcd7ca;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #006144;
+}
