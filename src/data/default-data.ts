@@ -27,7 +27,7 @@ export const initialDatabase: DatabaseSchema = {
       phone: "6289876543210",
       role: "Kesekretariatan & Presensi",
     },
-    domainUrl: "https://undangan.hmikomsaintek",
+    domainUrl: "https://undangan.hmikomsaintek.my.id",
     rundown: [
       {
         id: "rd-1",

@@ -18,7 +18,11 @@ export function GuestTicket({ config, guest, guestNameParam }: GuestTicketProps)
   const instance = guest?.instance || "Fakultas Sains dan Teknologi";
   const qrToken = guest?.qrCode || `MPR-${encodeURIComponent(name.slice(0, 15))}`;
   const hasAttended = guest?.hasAttended || false;
-  const domainUrl = config.domainUrl || "https://undangan.hmikomsaintek";
+  const domainUrl =
+    config.domainUrl ||
+    (typeof window !== "undefined" && window.location.origin
+      ? window.location.origin
+      : "https://undangan.hmikomsaintek.my.id");
   const verifyUrl = `${domainUrl}/presensi?code=${encodeURIComponent(qrToken)}`;
 
   return (
@@ -158,7 +162,7 @@ export function GuestTicket({ config, guest, guestNameParam }: GuestTicketProps)
               {qrToken}
             </p>
             <p className="mt-1 text-[9.5px] text-[#4A6357] text-center font-mono">
-              https://undangan.hmikomsaintek
+              {domainUrl}
             </p>
           </div>
         </div>

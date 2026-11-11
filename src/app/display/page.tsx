@@ -85,8 +85,11 @@ export default function DisplayMejaPage() {
 
   // Compute presensi URL for attendees scanning the QR code
   useEffect(() => {
-    // Official domain requested: https://undangan.hmikomsaintek
-    setPresensiUrl("https://undangan.hmikomsaintek/presensi");
+    const origin =
+      typeof window !== "undefined" && window.location.origin
+        ? window.location.origin
+        : "https://undangan.hmikomsaintek.my.id";
+    setPresensiUrl(`${origin}/presensi`);
   }, []);
 
   // Photo slideshow rotation

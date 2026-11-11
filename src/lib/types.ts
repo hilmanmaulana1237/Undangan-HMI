@@ -64,7 +64,7 @@ export interface EventConfig {
   venueName: string; // "Auditorium Fakultas Sains dan Teknologi"
   venueAddress: string; // "UIN Sunan Gunung Djati Bandung, Jl. A.H. Nasution No.105, Cipadung, Cibiru, Kota Bandung"
   mapsUrl: string;
-  domainUrl?: string; // Default: "https://undangan.hmikomsaintek"
+  domainUrl?: string; // Default: "https://undangan.hmikomsaintek.my.id"
   contactPerson: {
     name: string;
     phone: string; // e.g. "6281234567890"

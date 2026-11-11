@@ -39,7 +39,7 @@ import Image from "next/image";
 import * as XLSX from "xlsx";
 import { EventConfig, Guest, Wish, BankAccount, RundownItem } from "@/lib/types";
 
-const OFFICIAL_DOMAIN = "https://undangan.hmikomsaintek";
+const OFFICIAL_DOMAIN = "https://undangan.hmikomsaintek.my.id";
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -51,6 +51,16 @@ export default function AdminPage() {
 
   // Data
   const [config, setConfig] = useState<EventConfig | null>(null);
+
+  const getDomainUrl = () => {
+    if (config?.domainUrl && config.domainUrl.trim().length > 0) {
+      return config.domainUrl.replace(/\/+$/, "");
+    }
+    if (typeof window !== "undefined" && window.location.origin) {
+      return window.location.origin;
+    }
+    return OFFICIAL_DOMAIN;
+  };
   const [guests, setGuests] = useState<Guest[]>([]);
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -499,7 +509,7 @@ export default function AdminPage() {
       "Petugas Presensi": g.attendedBy || "-",
       "Jumlah Pax": g.rsvpPax || 1,
       "Kode Tiket / QR": g.qrCode,
-      "Link Undangan Resmi": `${OFFICIAL_DOMAIN}/invitation/${g.slug}`,
+      "Link Undangan Resmi": `${getDomainUrl()}/invitation/${g.slug}`,
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -621,7 +631,7 @@ export default function AdminPage() {
         (g) =>
           `"${g.name}","${g.category}","${g.instance}","${g.phone || "-"}","${g.rsvpStatus}","${
             g.hasAttended ? "HADIR" : "BELUM"
-          }","${g.qrCode}","${OFFICIAL_DOMAIN}/invitation/${g.slug}"`
+          }","${g.qrCode}","${getDomainUrl()}/invitation/${g.slug}"`
       )
       .join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
@@ -634,7 +644,7 @@ export default function AdminPage() {
 
   // Copy link using official domain
   const copyGuestLink = (slug: string) => {
-    const url = `${OFFICIAL_DOMAIN}/invitation/${slug}`;
+    const url = `${getDomainUrl()}/invitation/${slug}`;
     navigator.clipboard.writeText(url);
     setCopiedLink(slug);
     setTimeout(() => setCopiedLink(null), 2500);
@@ -642,7 +652,7 @@ export default function AdminPage() {
 
   // WhatsApp share
   const shareToWhatsApp = (guest: Guest) => {
-    const url = `${OFFICIAL_DOMAIN}/invitation/${guest.slug}`;
+    const url = `${getDomainUrl()}/invitation/${guest.slug}`;
     const text = `Assalamu'alaikum Wr. Wb.\n\nKepada Yth. *${guest.name}* (${guest.instance}),\n\nDengan hormat, kami mengundang Bapak/Ibu/Kanda/Yunda/Rekan untuk hadir pada agenda *MAPERCA (Masa Perkenalan Calon Anggota) HMI Komisariat Sains & Teknologi UIN Sunan Gunung Djati Bandung* 2026.\n\nSilakan buka undangan resmi dan tiket presensi digital Anda melalui tautan berikut:\n${url}\n\nTerima kasih. Yakin Usaha Sampai!\n_Panitia MAPERCA HMI FST 2026_`;
 
     let cleanPhone = (guest.phone || "").replace(/\D/g, "");
@@ -1032,7 +1042,7 @@ export default function AdminPage() {
                 Panel Panitia MAPERCA
               </h1>
               <p className="text-[9.5px] sm:text-[10px] text-[#006144] font-semibold">
-                undangan.hmikomsaintek
+                undangan.hmikomsaintek.my.id
               </p>
             </div>
           </div>
@@ -1994,6 +2004,24 @@ export default function AdminPage() {
                   }
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF9F5] border border-gray-200 text-xs text-[#0E2E21] focus:outline-none focus:border-[#006144] focus:bg-white"
                 />
+              </div>
+
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider font-bold text-[#006144] mb-1.5">
+                  Domain / URL Website Undangan
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://undangan.hmikomsaintek.my.id"
+                  value={configForm.domainUrl || ""}
+                  onChange={(e) =>
+                    setConfigForm({ ...configForm, domainUrl: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF9F5] border border-gray-200 text-xs text-[#0E2E21] focus:outline-none focus:border-[#006144] focus:bg-white"
+                />
+                <p className="mt-1 text-[10px] text-[#4A6357]">
+                  Digunakan sebagai link dasar saat panitia menyalin tautan undangan, membagikan ke WhatsApp, dan pada QR Code tiket.
+                </p>
               </div>
 
               <button

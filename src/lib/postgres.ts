@@ -32,7 +32,7 @@ export async function getPgConfig(): Promise<EventConfig> {
           data.rundown && data.rundown.length > 0
             ? data.rundown
             : initialDatabase.config.rundown,
-        domainUrl: data.domainUrl || process.env.NEXT_PUBLIC_APP_URL || "https://undangan.hmikomsaintek",
+        domainUrl: data.domainUrl || process.env.NEXT_PUBLIC_APP_URL || "https://undangan.hmikomsaintek.my.id",
       };
     }
     // Seed if empty
