@@ -22,8 +22,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
+    console.error("POST /api/rsvp error:", error);
     return NextResponse.json(
-      { success: false, message: "Gagal menyimpan RSVP" },
+      { success: false, message: (error as any)?.message || "Gagal menyimpan RSVP" },
       { status: 500 }
     );
   }

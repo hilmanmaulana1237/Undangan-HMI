@@ -12,7 +12,12 @@ import {
   submitPgRSVP,
   getPgWishes,
   deletePgWish,
+  getNextUniqueQrCode,
 } from "./postgres";
+
+export async function getNextQrCode(): Promise<string> {
+  return await getNextUniqueQrCode();
+}
 
 export async function getConfig(): Promise<EventConfig> {
   return await getPgConfig();

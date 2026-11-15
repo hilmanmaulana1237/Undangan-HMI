@@ -5,6 +5,7 @@ import {
   updateGuest,
   deleteGuest,
   getConfig,
+  getNextQrCode,
 } from "@/lib/db";
 import { generateGuestCode, generateSlug } from "@/lib/utils";
 
@@ -63,15 +64,12 @@ export async function POST(req: NextRequest) {
 
     // Support single add or bulk import
     if (Array.isArray(body.guests)) {
-      const allGuests = await getGuests();
-      let count = allGuests.length;
       const created = [];
 
       for (const item of body.guests) {
         if (!item.name?.trim()) continue;
-        count++;
         const slug = generateSlug(item.name);
-        const qrCode = generateGuestCode(count);
+        const qrCode = await getNextQrCode();
         const newG = await addGuest({
           name: item.name.trim(),
           slug,
@@ -95,9 +93,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Single add
-    const allGuests = await getGuests();
-    const qrCode =
-      body.qrCode || generateGuestCode(allGuests.length + 1);
+    const qrCode = body.qrCode || (await getNextQrCode());
     const slug = body.slug || generateSlug(body.name);
 
     const guest = await addGuest({
@@ -116,8 +112,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, guest });
   } catch (error) {
+    console.error("POST /api/guests error:", error);
     return NextResponse.json(
-      { success: false, message: "Gagal menambahkan tamu" },
+      { success: false, message: (error as any)?.message || "Gagal menambahkan tamu" },
       { status: 500 }
     );
   }

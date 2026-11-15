@@ -17,8 +17,9 @@ export async function POST(req: NextRequest) {
     const result = await checkInGuest(identifier.trim(), panitiaName, walkInData);
     return NextResponse.json(result);
   } catch (error) {
+    console.error("POST /api/attendance error:", error);
     return NextResponse.json(
-      { success: false, message: "Terjadi kesalahan saat mencatat presensi" },
+      { success: false, message: (error as any)?.message || "Terjadi kesalahan saat mencatat presensi" },
       { status: 500 }
     );
   }

@@ -6,10 +6,58 @@ const connectionString =
   process.env.DATABASE_URL ||
   "postgresql://neondb_owner:npg_cFdH7BO8Muxy@ep-falling-breeze-bb3w2xi9-pooler.c-15.us-east-1.aws.neon.tech/neondb?sslmode=require";
 
-export const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
+const globalForPg = globalThis as unknown as { pgPool?: Pool };
+
+export const pool =
+  globalForPg.pgPool ??
+  new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
+
+pool.on("error", (err) => {
+  console.error("Unexpected error on idle pg client", err);
 });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPg.pgPool = pool;
+}
+
+export async function getNextUniqueQrCode(): Promise<string> {
+  try {
+    const res = await pool.query(
+      "SELECT qr_code FROM maperca_guests WHERE qr_code IS NOT NULL"
+    );
+    let maxNum = 0;
+    const existing = new Set<string>();
+
+    for (const r of res.rows) {
+      if (!r.qr_code) continue;
+      existing.add(r.qr_code.toUpperCase());
+      const match = r.qr_code.match(/MPR-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+
+    let nextNum = maxNum + 1;
+    let code = `MPR-${String(nextNum).padStart(4, "0")}`;
+    while (existing.has(code.toUpperCase())) {
+      nextNum++;
+      code = `MPR-${String(nextNum).padStart(4, "0")}`;
+    }
+    return code;
+  } catch (err) {
+    console.error("getNextUniqueQrCode error:", err);
+    return `MPR-${Date.now().toString().slice(-4)}`;
+  }
+}
 
 export async function getPgConfig(): Promise<EventConfig> {
   try {
@@ -156,6 +204,21 @@ export async function addPgGuest(
   const id = `gst-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
   const now = new Date();
 
+  // Ensure unique QR Code
+  let qrCode = guestData.qrCode;
+  if (!qrCode) {
+    qrCode = await getNextUniqueQrCode();
+  } else {
+    // Check if the provided qrCode already exists
+    const checkDup = await pool.query(
+      "SELECT id FROM maperca_guests WHERE UPPER(qr_code) = UPPER($1) LIMIT 1",
+      [qrCode]
+    );
+    if (checkDup.rows.length > 0) {
+      qrCode = await getNextUniqueQrCode();
+    }
+  }
+
   await pool.query(
     `INSERT INTO maperca_guests (id, name, slug, category, instance, phone, pax, rsvp_status, rsvp_pax, qr_code, has_attended, notes, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
@@ -169,7 +232,7 @@ export async function addPgGuest(
       guestData.pax || 1,
       guestData.rsvpStatus || "pending",
       guestData.rsvpPax || 1,
-      guestData.qrCode,
+      qrCode,
       guestData.hasAttended || false,
       guestData.notes || "",
       now,
@@ -180,6 +243,7 @@ export async function addPgGuest(
   return {
     ...guestData,
     id,
+    qrCode,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
   };
@@ -273,12 +337,10 @@ export async function checkInPgGuest(
   // If not found and walk-in data provided
   if (res.rows.length === 0 && walkInData) {
     const slug = clean.toLowerCase().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-");
-    const countRes = await pool.query("SELECT COUNT(*) FROM maperca_guests");
-    const count = parseInt(countRes.rows[0].count) + 1;
-    const qrCode = `MPR-${String(count).padStart(4, "0")}`;
+    const qrCode = await getNextUniqueQrCode();
     const newGuest = await addPgGuest({
       name: clean,
-      slug,
+      slug: slug || `walkin-${Date.now()}`,
       category: (walkInData.category as any) || "Calon Anggota (Maba FST)",
       instance: walkInData.instance || "Fakultas Sains dan Teknologi",
       phone: walkInData.phone || "",
@@ -366,72 +428,101 @@ export async function submitPgRSVP(params: {
   pax?: number;
   message?: string;
 }): Promise<{ success: boolean; guest?: Guest; wish?: Wish }> {
-  const { identifier, name, category, status, pax = 1, message } = params;
-  const lookup = identifier || name || "";
+  try {
+    const { identifier, name, category, status, pax = 1, message } = params;
+    const lookup = (identifier || name || "").trim();
 
-  const guestRes = await pool.query(
-    `SELECT * FROM maperca_guests 
-     WHERE id = $1 
-        OR UPPER(qr_code) = UPPER($1) 
-        OR LOWER(slug) = LOWER($1) 
-        OR LOWER(name) = LOWER($1)
-     LIMIT 1`,
-    [lookup]
-  );
-
-  let guest: Guest | undefined;
-  const now = new Date();
-
-  if (guestRes.rows.length > 0) {
-    const r = guestRes.rows[0];
-    await pool.query(
-      "UPDATE maperca_guests SET rsvp_status = $1, rsvp_pax = $2, updated_at = $3 WHERE id = $4",
-      [status, pax, now, r.id]
-    );
-    guest = {
-      id: r.id,
-      name: r.name,
-      slug: r.slug,
-      category: r.category,
-      instance: r.instance,
-      phone: r.phone,
-      pax: r.pax,
-      rsvpStatus: status,
-      rsvpPax: pax,
-      qrCode: r.qr_code,
-      hasAttended: r.has_attended,
-      attendedAt: r.attended_at ? new Date(r.attended_at).toISOString() : undefined,
-      attendedBy: r.attended_by,
-      notes: r.notes,
-      createdAt: new Date(r.created_at).toISOString(),
-      updatedAt: now.toISOString(),
-    };
-  }
-
-  let wish: Wish | undefined;
-  if (message && message.trim().length > 0) {
-    const wishId = `wsh-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const guestName = guest ? guest.name : name || lookup || "Tamu Undangan";
-    const guestCat = guest ? guest.category : category || "Tamu Undangan";
-
-    await pool.query(
-      `INSERT INTO maperca_wishes (id, guest_id, guest_name, category, attendance, message, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [wishId, guest?.id || null, guestName, guestCat, status, message.trim(), now]
+    let guestRes = await pool.query(
+      `SELECT * FROM maperca_guests 
+       WHERE id = $1 
+          OR UPPER(qr_code) = UPPER($1) 
+          OR LOWER(slug) = LOWER($1) 
+          OR LOWER(name) = LOWER($1)
+       LIMIT 1`,
+      [lookup]
     );
 
-    wish = {
-      id: wishId,
-      guestId: guest?.id,
-      guestName,
-      category: guestCat,
-      attendance: status,
-      message: message.trim(),
-      createdAt: now.toISOString(),
-    };
-  }
+    let guest: Guest | undefined;
+    const now = new Date();
 
-  return { success: true, guest, wish };
+    if (guestRes.rows.length > 0) {
+      const r = guestRes.rows[0];
+      await pool.query(
+        "UPDATE maperca_guests SET rsvp_status = $1, rsvp_pax = $2, updated_at = $3 WHERE id = $4",
+        [status, pax, now, r.id]
+      );
+      guest = {
+        id: r.id,
+        name: r.name,
+        slug: r.slug,
+        category: r.category,
+        instance: r.instance,
+        phone: r.phone,
+        pax: r.pax,
+        rsvpStatus: status,
+        rsvpPax: pax,
+        qrCode: r.qr_code,
+        hasAttended: r.has_attended,
+        attendedAt: r.attended_at ? new Date(r.attended_at).toISOString() : undefined,
+        attendedBy: r.attended_by,
+        notes: r.notes,
+        createdAt: new Date(r.created_at).toISOString(),
+        updatedAt: now.toISOString(),
+      };
+    } else {
+      // Auto-register new guest from RSVP form if not existing
+      const guestName = (name || lookup).trim();
+      if (guestName) {
+        const slug = guestName
+          .toLowerCase()
+          .replace(/[^\w\s-]/g, "")
+          .replace(/[\s_-]+/g, "-");
+        const qrCode = await getNextUniqueQrCode();
+
+        guest = await addPgGuest({
+          name: guestName,
+          slug: slug || `guest-${Date.now()}`,
+          category: (category as any) || "Calon Anggota (Maba FST)",
+          instance: "Fakultas Sains dan Teknologi",
+          phone: "",
+          pax: pax || 1,
+          rsvpStatus: status,
+          rsvpPax: pax || 1,
+          qrCode,
+          hasAttended: false,
+          notes: "RSVP Mandiri Website",
+        });
+      }
+    }
+
+    let wish: Wish | undefined;
+    if (message && message.trim().length > 0) {
+      const wishId = `wsh-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const guestName = guest ? guest.name : name || lookup || "Tamu Undangan";
+      const guestCat = guest ? guest.category : category || "Tamu Undangan";
+
+      await pool.query(
+        `INSERT INTO maperca_wishes (id, guest_id, guest_name, category, attendance, message, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [wishId, guest?.id || null, guestName, guestCat, status, message.trim(), now]
+      );
+
+      wish = {
+        id: wishId,
+        guestId: guest?.id,
+        guestName,
+        category: guestCat,
+        attendance: status,
+        message: message.trim(),
+        createdAt: now.toISOString(),
+      };
+    }
+
+    return { success: true, guest, wish };
+  } catch (err) {
+    console.error("submitPgRSVP error:", err);
+    throw err;
+  }
 }
 
 export async function getPgWishes(): Promise<Wish[]> {
